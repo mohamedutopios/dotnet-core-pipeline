@@ -1,0 +1,48 @@
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  imageRepository: 'dotnet-net'
+  containerRegistry: 'formationutopios.azurecr.io'
+  tag: '$(Build.BuildId)'
+  dockerRegistryServiceConnection: 'demoAcrConnection'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+
+stages:
+- stage: BuildAndTest
+  jobs:
+  - job: BuildAndTestJob
+    steps:
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildconfiguration)'
+
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: 'test'
+        projects: '**/dotnetcore-tests/*.csproj'
+        arguments: '--configuration $(buildconfiguration) --logger trx'
+        testRunTitle: 'dotnet test'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish .NET Core Project'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildconfiguration) --output $(Build.ArtifactStagingDirectory)'
+
+    - task: Docker@2
+      displayName: 'Build and Push Docker Image'
+      inputs:
+        command: 'buildAndPush'
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+            $(tag)
